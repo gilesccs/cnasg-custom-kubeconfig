@@ -1,6 +1,8 @@
 package com.vmware.cnasg.kubeconfig;
 
 import com.vmware.cnasg.kubeconfig.watcher.CertificateSigningRequestWatcher;
+import io.fabric8.kubernetes.api.model.Namespace;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.certificates.CertificateSigningRequest;
 import io.fabric8.kubernetes.api.model.certificates.CertificateSigningRequestBuilder;
 import io.fabric8.kubernetes.client.Config;
@@ -38,7 +40,6 @@ import java.util.*;
 @SpringBootApplication
 public class CnasgCustomKubeconfigApplication implements CommandLineRunner {
 
-
     public static final Logger logger =
             LoggerFactory.getLogger(CnasgCustomKubeconfigApplication.class);
 
@@ -62,40 +63,37 @@ public class CnasgCustomKubeconfigApplication implements CommandLineRunner {
             logger.error("error",e);
         }
 
-        String userName = "tuckkin";
+        String USERNAME = "tuckkin";
         KeyPair keyPair = generateRSAKeyPair();
-        String encodedCSR = generateEncodedCSR(keyPair,userName);
+        String encodedCSR = generateEncodedCSR(keyPair,USERNAME);
         String encodedPrivateKey = generateEncodedSecretKey(keyPair.getPrivate());
-        String encodedPublicKey = generateEncodedSecretKey(keyPair.getPublic());
-
-//        Map<String, ArrayList<String>> extraMap = new HashMap<>();
-//        ArrayList<String> encodedPrivateKeyList = new ArrayList<>();
-//        encodedPrivateKeyList.add(encodedPrivateKey);
-//        ArrayList<String> encodedPublicKeyList = new ArrayList<>();
-//        encodedPublicKeyList.add((encodedPublicKey));
-//        extraMap.put("encodedPrivateKey",encodedPrivateKeyList);
-//        extraMap.put("encodedPublicKey",encodedPublicKeyList);
+//        String encodedPublicKey = generateEncodedSecretKey(keyPair.getPublic());
 
         Map<String,String> annotations = new HashMap<>();
         annotations.put("self-service-csr-request","true");
         annotations.put("private-key",encodedPrivateKey);
-        annotations.put("public-key",encodedPublicKey);
+//        annotations.put("public-key",encodedPublicKey);
 
-        k8sClient.certificateSigningRequests().watch(new CertificateSigningRequestWatcher(k8sClient));
-        CertificateSigningRequest csr = new CertificateSigningRequestBuilder()
-                .withNewMetadata()
-                    .withName(userName)
+        CertificateSigningRequest tmpCSR = k8sClient.certificateSigningRequests().withName(USERNAME).get();
+        if (tmpCSR == null) {
+            k8sClient.certificateSigningRequests().watch(new CertificateSigningRequestWatcher(k8sClient));
+            CertificateSigningRequest csr = new CertificateSigningRequestBuilder()
+                    .withNewMetadata()
+                    .withName(USERNAME)
                     .withAnnotations(annotations)
-                .endMetadata()
-                .withNewSpec()
+                    .endMetadata()
+                    .withNewSpec()
                     .addNewGroup("system:authenticated")
                     .withRequest(encodedCSR)
                     .withSignerName("kubernetes.io/kube-apiserver-client")
                     .addNewUsage("client auth")
-                .endSpec()
-                .build();
-        k8sClient.certificateSigningRequests().create(csr);
-        SerializationUtils.dumpAsYaml(csr);
+                    .endSpec()
+                    .build();
+            k8sClient.certificateSigningRequests().create(csr);
+            logger.info("CSR["+USERNAME+"] created");
+        } else {
+            logger.info("CSR["+USERNAME+"] already exists");
+        }
     }
 
     @PreDestroy
