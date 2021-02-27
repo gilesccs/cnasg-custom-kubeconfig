@@ -63,7 +63,7 @@ public class CnasgCustomKubeconfigApplication implements CommandLineRunner {
             logger.error("error",e);
         }
 
-        String USERNAME = "tuckkin";
+        String USERNAME = "27-2-2021-14-15";
         KeyPair keyPair = generateRSAKeyPair();
         String encodedCSR = generateEncodedCSR(keyPair,USERNAME);
         String encodedPrivateKey = generateEncodedSecretKey(keyPair.getPrivate());

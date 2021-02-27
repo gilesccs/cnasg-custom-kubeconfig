@@ -13,16 +13,24 @@ import io.fabric8.kubernetes.client.internal.KubeConfigUtils;
 import io.fabric8.kubernetes.client.internal.SerializationUtils;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
 import okhttp3.*;
+
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.vmware.cnasg.kubeconfig.service.NotificationService;
+
 
 public class CertificateSigningRequestWatcher extends AbstractWatcher<CertificateSigningRequest> {
 
@@ -35,7 +43,10 @@ public class CertificateSigningRequestWatcher extends AbstractWatcher<Certificat
     private static final String USER_ROLE = "cnasg-user-role";
     private static final String USER_ROLE_FILE = "/cnasg-user-role.yaml";
     private static final String USER_ROLE_BINDING_PREFIX = "cnasg-user-role-binding-";
-
+    
+    @Autowired
+	private NotificationService nService;
+    
     public CertificateSigningRequestWatcher(KubernetesClient client) {
         super(client);
     }
@@ -159,10 +170,32 @@ public class CertificateSigningRequestWatcher extends AbstractWatcher<Certificat
 
         String kubeConfigData = null;
         try {
-            KubeConfigUtils.persistKubeConfigIntoFile(config,"/tmp/" + namedContext.getName());
-            kubeConfigData = Files.readString(Paths.get("/tmp/" + namedContext.getName()));
+        	ClassLoader classLoader = getClass().getClassLoader();
+        	String path = classLoader.getResource(".").getFile() + "testconfig.yaml";
+//        	System.out.println("path " + path);
+        	path = path.substring(1);
+//        	Path paths = classLoader.getResource(".").getFile() + /testconfig.yaml;
+        	File file = new File(path);
+        	file.createNewFile();
+//        	(config,"/tmp/" + namedContext.getName());
+        	System.out.println("file created");
+            KubeConfigUtils.persistKubeConfigIntoFile(config,path);
+//            kubeConfigData = Files.readString(Paths.get("/tmp/" + namedContext.getName()));
+            try{
+//            	NotificationService nService = new NotificationService();
+            	System.out.println(nService);
+            	nService.sendKubeConfigNotification(path);
+            }catch(Exception e) {
+            	logger.error("Error in sending email",e);
+            }
+            System.out.println("email sent");
+            kubeConfigData = Files.readString(Paths.get(path));
+            System.out.println("kube config read");
+            
         } catch (IOException e) {
             logger.error("error",e);
+        } catch (Exception e) {
+        	logger.error("File creation/generation error ",e);
         }
         return kubeConfigData;
     }
